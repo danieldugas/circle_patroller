@@ -119,7 +119,6 @@ class CirclePatroller(object):
                              [-1, 0]])
         rot = left_90 if c_is_trig else right_90
         cp_direction = np.dot(rot, delta_norm) # direction at closest point
-        direction_to_cp = cp_xy - robot_xy
 
         # now we think in circles. The smallest circle our robot can do at max speed is
         # f(max speed, max rot)
@@ -142,37 +141,45 @@ class CirclePatroller(object):
         RADIUS_DECAY = 0.05
         lead_length = LEAD_RATIO * cr
         lp_xy = cp_xy + cp_direction * lead_length
-        direction_to_lp = lp_xy - robot_xy
-        direction_to_lp = direction_to_cp / np.linalg.norm(direction_to_lp)
+        delta_to_lp = lp_xy - robot_xy
+        dist_to_lp = np.linalg.norm(delta_to_lp)
+        direction_to_lp = delta_to_lp / dist_to_lp
 
         # phi is directly related to the trajectory radius. phi [-1, 1]
         # phi = 0: going straight to lp -> R = inf
-        # phi = 0.5: perpendicular to lp -> R = 0.1 * cr
-        # phi = 1: going away from lp -> R = 0.05
-        phi = angle_between_vectors(direction, direction_to_lp) / np.pi # -1, 1
+        # phi = [-pi/2, pi/2]: pick circle radius which passes through LP
+        # phi = +=pi/2: perpendicular to lp -> R = |LP - RXY| / 2
+        # phi > pi/2: going away from lp -> R = +=0
+        phi = angle_between_vectors(direction, direction_to_lp)
+        if abs(phi) > 0.5:
+            traj_radius = 0.001 * np.sign(phi)
+        else:
+            traj_radius = dist_to_lp / 2. / np.sin(phi)
         traj_radius = - RADIUS_DECAY * cr / phi
 
         # robot limits: at max vel radius is given. For smaller radius, need to reduce vel
         traj_vel = max_vel
         nominal_radius = max_vel / max_rot
         if abs(traj_radius) < abs(nominal_radius):
-            traj_vel = traj_radius * max_rot
+            traj_vel = abs(traj_radius) * max_rot
         traj_rot = traj_vel / traj_radius
         direction_to_traj_center = np.dot(left_90, direction)
         traj_center = robot_xy + direction_to_traj_center * traj_radius
 
         markers = MarkerArray()
         # trajectory
-        th = np.linspace(0, 2*np.pi, 10)
+        N = 20 # subdivisions
+        th = np.linspace(0, 2*np.pi, N)
         xy = traj_radius * np.array([np.cos(th), np.sin(th)]).T
         points = traj_center + xy
         color = [1., 0.5, 0., 1.] # rgba orange
-        marker = self.path_as_marker(points, self.static_frame, "circle_patrol", id_=0, color=color)
+        marker = self.path_as_marker(points, self.static_frame, 0.02, "circle_patrol", id_=0, color=color)
         markers.markers.append(marker)
         # leading point
-        marker = self.point_as_marker(lp_xy, self.static_frame, "circle_patrol", id_=1, color=color)
+        marker = self.point_as_marker(lp_xy, self.static_frame, 0.02, "circle_patrol", id_=1, color=color)
+        markers.markers.append(marker)
 
-        self.traj_pub.publish(marker)
+        self.traj_pub.publish(markers)
 
         cmd_vel_msg = Twist()
         cmd_vel_msg.linear.x = traj_vel
@@ -180,7 +187,7 @@ class CirclePatroller(object):
         self.cmd_vel_pub.publish(cmd_vel_msg)
 
     def get_robot_in_static_tf(self, time):
-        return self.get_x_in_static_tf(self, self.robot_frame, time)
+        return self.get_x_in_static_tf(self.robot_frame, time)
 
     def get_x_in_static_tf(self, child_frame, time):
         try:
@@ -199,16 +206,16 @@ class CirclePatroller(object):
             return
         markers = MarkerArray()
         # trajectory
-        N = 10 # subdivisions
+        N = 20 # subdivisions
         th = np.linspace(0, 2*np.pi, N)
         xy = self.circle_radius * np.array([np.cos(th), np.sin(th)]).T
         points = self.circle_center + xy
         color = [0., 0., 1., 1.] # rgba blue
-        marker = self.path_as_marker(points, self.static_frame, "circle_patrol", color=color)
+        marker = self.path_as_marker(points, self.static_frame, 0.02, "circle_patrol", color=color)
         markers.markers.append(marker)
         self.patrol_pub.publish(markers)
 
-    def path_as_marker(self, path_xy, frame, scale, namespace, time=None, color=None, id_=0):
+    def path_as_marker(self, path_xy, frame, scale, namespace, time=None, color=None, id_=0, z=0):
         marker = Marker()
         time = rospy.Time.now() if time is None else time
         marker.header.stamp.secs = time.secs
@@ -230,7 +237,7 @@ class CirclePatroller(object):
             marker.color.g = color[1]
             marker.color.b = color[2]
             marker.color.a = color[3]
-        marker.points = [Point(xy[0], xy[1], 1) for xy in path_xy]
+        marker.points = [Point(xy[0], xy[1], z) for xy in path_xy]
         return marker
 
     def point_as_marker(self, point_xy, frame, scale, namespace,
@@ -239,7 +246,7 @@ class CirclePatroller(object):
                         text='',
                         color=[0., 0., 1., 1.], # rgba
                         id_=0,
-                        z=1.,
+                        z=0.,
                         ):
         if time is None:
             time = rospy.Time.now()
