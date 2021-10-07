@@ -33,6 +33,7 @@ class CirclePatroller(object):
         # vars
         self.lock = threading.Lock() # for avoiding race conditions
         self.circle_center = None
+        self.DISARMED = False
         # tf
         self.tf_listener = tf.TransformListener()
         self.tf_br = tf.TransformBroadcaster()
@@ -53,6 +54,8 @@ class CirclePatroller(object):
         # Timers
         rospy.Timer(rospy.Duration(0.1), self.check_position_callback)
         rospy.Timer(rospy.Duration(1.), self.publish_patrol_callback)
+        # Shutdown hook
+        rospy.on_shutdown(self.on_exit_stop_robot)
         # let's go.
         try:
             rospy.spin()
@@ -181,10 +184,11 @@ class CirclePatroller(object):
 
         self.traj_pub.publish(markers)
 
-        cmd_vel_msg = Twist()
-        cmd_vel_msg.linear.x = traj_vel
-        cmd_vel_msg.angular.z = traj_rot
-        self.cmd_vel_pub.publish(cmd_vel_msg)
+        if not self.DISARMED:
+            cmd_vel_msg = Twist()
+            cmd_vel_msg.linear.x = traj_vel
+            cmd_vel_msg.angular.z = traj_rot
+            self.cmd_vel_pub.publish(cmd_vel_msg)
 
     def get_robot_in_static_tf(self, time):
         return self.get_x_in_static_tf(self.robot_frame, time)
@@ -273,6 +277,17 @@ class CirclePatroller(object):
         marker.color.a = color[3]
         marker.text = text
         return marker
+
+    def on_exit_stop_robot(self):
+        if self.DISARMED is False:
+            self.DISARMED = True
+            rospy.loginfo("Publishing 0 cmd_vel before exiting.")
+            for i in range(10):
+                cmd_vel_msg = Twist()
+                cmd_vel_msg.linear.x = 0
+                cmd_vel_msg.angular.z = 0
+                self.cmd_vel_pub.publish(cmd_vel_msg)
+            rospy.sleep(0.1)
 
 def angle_between_vectors(va, vb):
     """ result: th(va) - th(vb) in radians """
