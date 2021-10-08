@@ -44,7 +44,7 @@ class CirclePatroller(object):
         self.max_rot = rospy.get_param("~max_rot", 0.3)
         self.max_vel = rospy.get_param("~max_vel", 0.1)
         # rotation depends on sign: R > 0: trig, R < 0: clockwise (from top)
-        self.circle_radius = rospy.get_param("~circle_radius", 0.7)
+        self.circle_radius = rospy.get_param("~circle_radius", 0.8)
         # Publishers
         self.patrol_pub = rospy.Publisher("/circle_patroller/patrol", MarkerArray, queue_size=1)
         self.traj_pub = rospy.Publisher("/circle_patroller/trajectory", MarkerArray, queue_size=1)
