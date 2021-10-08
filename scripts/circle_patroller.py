@@ -39,12 +39,12 @@ class CirclePatroller(object):
         self.tf_br = tf.TransformBroadcaster()
         self.tf_timeout = rospy.Duration(1.)
         # Localization Manager
-        self.static_frame = rospy.get_param("~static_frame", "gmap")  # frame where walls don't move (gmap is not great, as the map can change) # noqa
+        self.static_frame = rospy.get_param("~static_frame", "map")  # frame where walls don't move (gmap is not great, as the map can change) # noqa
         self.robot_frame = rospy.get_param("~robot_frame", "base_footprint")
-        self.max_rot = rospy.get_param("~max_rot", 0.5)
-        self.max_vel = rospy.get_param("~max_vel", 0.3)
+        self.max_rot = rospy.get_param("~max_rot", 0.3)
+        self.max_vel = rospy.get_param("~max_vel", 0.1)
         # rotation depends on sign: R > 0: trig, R < 0: clockwise (from top)
-        self.circle_radius = rospy.get_param("~circle_radius", 1.)
+        self.circle_radius = rospy.get_param("~circle_radius", 0.7)
         # Publishers
         self.patrol_pub = rospy.Publisher("/circle_patroller/patrol", MarkerArray, queue_size=1)
         self.traj_pub = rospy.Publisher("/circle_patroller/trajectory", MarkerArray, queue_size=1)
@@ -140,7 +140,7 @@ class CirclePatroller(object):
         # case 3: pointing away from LP: go to/with circle (R -> +-0)
 
         # leading point
-        LEAD_RATIO = 0.3
+        LEAD_RATIO = 1.
         RADIUS_DECAY = 0.05
         lead_length = LEAD_RATIO * cr
         lp_xy = cp_xy + cp_direction * lead_length
