@@ -140,10 +140,11 @@ class CirclePatroller(object):
         # case 3: pointing away from LP: go to/with circle (R -> +-0)
 
         # leading point
-        LEAD_RATIO = 1.
+        LEAD_ANGLE = (np.pi / 4.) if cr > 0 else (-np.pi / 4.)
         RADIUS_DECAY = 0.05
-        lead_length = LEAD_RATIO * np.abs(cr)
-        lp_xy = cp_xy + cp_direction * lead_length
+        rot = np.array([[np.cos(LEAD_ANGLE), -np.sin(LEAD_ANGLE)],
+                        [np.sin(LEAD_ANGLE), np.cos(LEAD_ANGLE)]])
+        lp_xy = C + np.dot(rot, delta_norm) * np.abs(cr)
         delta_to_lp = lp_xy - robot_xy
         dist_to_lp = np.linalg.norm(delta_to_lp)
         direction_to_lp = delta_to_lp / dist_to_lp
@@ -154,11 +155,10 @@ class CirclePatroller(object):
         # phi = +=pi/2: perpendicular to lp -> R = |LP - RXY| / 2
         # phi > pi/2: going away from lp -> R = +=0
         phi = angle_between_vectors(direction, direction_to_lp)
-        if abs(phi) > 0.5:
-            traj_radius = 0.001 * np.sign(phi)
+        if abs(phi) > (np.pi / 4.):
+            traj_radius = - 0.001 * np.sign(phi)
         else:
-            traj_radius = dist_to_lp / 2. / np.sin(phi)
-        traj_radius = - RADIUS_DECAY * np.abs(cr) / phi
+            traj_radius = - dist_to_lp / 2. / np.sin(phi)
 
         # robot limits: at max vel radius is given. For smaller radius, need to reduce vel
         traj_vel = max_vel
