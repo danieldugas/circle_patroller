@@ -39,7 +39,7 @@ class CirclePatroller(object):
         self.tf_br = tf.TransformBroadcaster()
         self.tf_timeout = rospy.Duration(1.)
         # Localization Manager
-        self.static_frame = rospy.get_param("~static_frame", "map")  # frame where walls don't move (gmap is not great, as the map can change) # noqa
+        self.static_frame = rospy.get_param("~static_frame", "map") # frame where walls don't move (gmap is not great, as the map can change) # noqa
         self.robot_frame = rospy.get_param("~robot_frame", "base_footprint")
         self.max_rot = rospy.get_param("~max_rot", 0.3)
         self.max_vel = rospy.get_param("~max_vel", 0.1)
@@ -115,7 +115,7 @@ class CirclePatroller(object):
 
         # closest point
         delta_norm = delta / radius
-        cp_xy = C + delta_norm * cr
+        cp_xy = C + delta_norm * np.abs(cr)
         left_90 = np.array([[0, -1],
                             [1, 0]])
         right_90 = np.array([[0, 1],
@@ -142,7 +142,7 @@ class CirclePatroller(object):
         # leading point
         LEAD_RATIO = 1.
         RADIUS_DECAY = 0.05
-        lead_length = LEAD_RATIO * cr
+        lead_length = LEAD_RATIO * np.abs(cr)
         lp_xy = cp_xy + cp_direction * lead_length
         delta_to_lp = lp_xy - robot_xy
         dist_to_lp = np.linalg.norm(delta_to_lp)
@@ -158,7 +158,7 @@ class CirclePatroller(object):
             traj_radius = 0.001 * np.sign(phi)
         else:
             traj_radius = dist_to_lp / 2. / np.sin(phi)
-        traj_radius = - RADIUS_DECAY * cr / phi
+        traj_radius = - RADIUS_DECAY * np.abs(cr) / phi
 
         # robot limits: at max vel radius is given. For smaller radius, need to reduce vel
         traj_vel = max_vel
